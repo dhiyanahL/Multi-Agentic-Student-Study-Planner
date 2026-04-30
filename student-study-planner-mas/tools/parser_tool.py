@@ -3,34 +3,16 @@
 from __future__ import annotations
 
 
-def parse_student_input(user_text: str) -> dict[str, object]:
-    """Parse free-form student text into a normalized mock planning payload.
+def parse_student_input(available_hours_per_day: int, tasks: list[dict]) -> dict[str, object]:
+    """
+    Extracts available study hours and a list of academic tasks from student input.
+    The tasks list must contain dictionaries with the keys: subject, task_name, deadline_days, and difficulty.
 
     Args:
-        user_text: Raw natural-language input provided by the student.
-
-    Returns:
-        A mock dictionary containing:
-        - available_hours_per_day: Estimated integer study hours per day.
-        - tasks: A list of task dictionaries with `subject`, `task_name`,
-          `deadline_days`, and `difficulty`.
+        available_hours_per_day: The number of hours the student can study per day.
+        tasks: A list of task dictionaries extracted from the user input.
     """
-    _ = user_text  # Placeholder until real parsing logic is implemented.
-
     return {
-        "available_hours_per_day": 3,
-        "tasks": [
-            {
-                "subject": "Mathematics",
-                "task_name": "Complete calculus assignment",
-                "deadline_days": 2,
-                "difficulty": "high",
-            },
-            {
-                "subject": "Computer Science",
-                "task_name": "Revise graph algorithms",
-                "deadline_days": 4,
-                "difficulty": "medium",
-            },
-        ],
+        "available_hours_per_day": available_hours_per_day,
+        "tasks": tasks
     }
