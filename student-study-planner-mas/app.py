@@ -10,6 +10,7 @@ from pprint import pprint
 from langgraph.graph import END, START, StateGraph
 
 from agents.schedule_agent import run_schedule_generation_agent
+from agents.task_prioritization_agent import run_task_prioritization_agent
 from state.state_schema import PlannerState, create_initial_state
 
 
@@ -23,18 +24,21 @@ def _log_event(
     output_data: dict | None = None,
     details: dict | None = None,
 ) -> None:
-    """Append a structured observability event to shared state."""
-    state.setdefault("logs", []).append(
-        {
-            "timestamp": datetime.now().isoformat(timespec="seconds"),
-            "agent": agent,
-            "action": action,
-            "input": input_data or {},
-            "tool_called": tool_called or "",
-            "output": output_data or {},
-            "details": details or {},
-        }
-    )
+    event = {
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "agent": agent,
+        "action": action,
+        "input": input_data or {},
+        "tool_called": tool_called or "",
+        "output": output_data or {},
+        "details": details or {},
+    }
+
+    # ✅ store in state
+    state.setdefault("logs", []).append(event)
+
+    # ✅ print to terminal
+    #print(json.dumps(event, indent=2))
 
 
 def _persist_logs(state: PlannerState) -> None:
@@ -66,24 +70,8 @@ def input_understanding_node(state: PlannerState) -> PlannerState:
 
 
 def task_prioritization_node(state: PlannerState) -> PlannerState:
-    """
-    Placeholder for Agent 2.
-
-    For now: if prioritized_tasks is empty but tasks exist, pass tasks through.
-    """
-    if not state.get("prioritized_tasks") and state.get("tasks"):
-        state["prioritized_tasks"] = state["tasks"]
-
-    _log_event(
-        state,
-        "TaskPrioritizationAgent",
-        "pass_through",
-        input_data={"task_count": len(state.get("tasks", []))},
-        tool_called="",
-        output_data={"prioritized_task_count": len(state.get("prioritized_tasks", []))},
-        details={"message": "Placeholder node. Integrate priority tool here."},
-    )
-    return state
+    """Agent 2 node: ranks tasks using the prioritization agent toolchain."""
+    return run_task_prioritization_agent(state)
 
 
 def schedule_generation_node(state: PlannerState) -> PlannerState:
@@ -162,8 +150,20 @@ def run_demo() -> PlannerState:
 
 if __name__ == "__main__":
     final_state = run_demo()
-    _persist_logs(final_state)
-    pprint(final_state["schedule"])
-    pprint(final_state["schedule_meta"])
-    pprint(final_state["feedback"])
 
+    # 🔥 PRINT ALL AGENT LOGS (this is what you need)
+    print("\n========== AGENT EXECUTION LOGS ==========")
+    for event in final_state.get("logs", []):
+        print(json.dumps(event, indent=2))
+
+    # keep file logging
+    _persist_logs(final_state)
+
+    print("\n========== FINAL SCHEDULE ==========")
+    pprint(final_state["schedule"])
+
+    print("\n========== SCHEDULE META ==========")
+    pprint(final_state["schedule_meta"])
+
+    print("\n========== FEEDBACK ==========")
+    pprint(final_state["feedback"])
