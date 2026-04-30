@@ -10,6 +10,7 @@ from pprint import pprint
 from langgraph.graph import END, START, StateGraph
 
 from agents.schedule_agent import run_schedule_generation_agent
+from agents.task_prioritization_agent import run_task_prioritization_agent
 from state.state_schema import PlannerState, create_initial_state
 
 
@@ -66,24 +67,8 @@ def input_understanding_node(state: PlannerState) -> PlannerState:
 
 
 def task_prioritization_node(state: PlannerState) -> PlannerState:
-    """
-    Placeholder for Agent 2.
-
-    For now: if prioritized_tasks is empty but tasks exist, pass tasks through.
-    """
-    if not state.get("prioritized_tasks") and state.get("tasks"):
-        state["prioritized_tasks"] = state["tasks"]
-
-    _log_event(
-        state,
-        "TaskPrioritizationAgent",
-        "pass_through",
-        input_data={"task_count": len(state.get("tasks", []))},
-        tool_called="",
-        output_data={"prioritized_task_count": len(state.get("prioritized_tasks", []))},
-        details={"message": "Placeholder node. Integrate priority tool here."},
-    )
-    return state
+    """Agent 2 node: ranks tasks using the prioritization agent toolchain."""
+    return run_task_prioritization_agent(state)
 
 
 def schedule_generation_node(state: PlannerState) -> PlannerState:
