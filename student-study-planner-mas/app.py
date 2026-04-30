@@ -9,6 +9,7 @@ from pprint import pprint
 
 from langgraph.graph import END, START, StateGraph
 
+from agents.input_agent import run_input_agent
 from agents.schedule_agent import run_schedule_generation_agent
 from agents.task_prioritization_agent import run_task_prioritization_agent
 from state.state_schema import PlannerState, create_initial_state
@@ -52,20 +53,9 @@ def _persist_logs(state: PlannerState) -> None:
 
 
 def input_understanding_node(state: PlannerState) -> PlannerState:
-    """
-    Placeholder for Agent 1.
-
-    If tasks already exist in state (demo/testing), this node passes through.
-    """
-    _log_event(
-        state,
-        "InputUnderstandingAgent",
-        "pass_through",
-        input_data={"raw_input_present": bool(state.get("raw_input"))},
-        tool_called="",
-        output_data={"task_count": len(state.get("tasks", []))},
-        details={"message": "Placeholder node. Integrate parser tool here."},
-    )
+    """Agent 1 node: parse raw student input into tasks and profile."""
+    updates = run_input_agent(state)
+    state.update(updates)
     return state
 
 
@@ -121,43 +111,44 @@ def build_graph():
     return graph.compile()
 
 
-def run_demo() -> PlannerState:
+def run_demo(raw_input: str = "") -> PlannerState:
     """Run a sample end-to-end flow using one shared global state."""
-    initial_state = create_initial_state()
-    initial_state["student_profile"]["available_hours_per_day"] = 4
-    initial_state["tasks"] = [
-        {
-            "subject": "DBMS",
-            "task_name": "assignment",
-            "priority_score": 9.5,
-            "deadline_days": 2,
-            "difficulty": "hard",
-            "estimated_hours": 8.0,
-        },
-        {
-            "subject": "OOP",
-            "task_name": "quiz",
-            "priority_score": 6.0,
-            "deadline_days": 5,
-            "difficulty": "medium",
-            "estimated_hours": 3.0,
-        },
-    ]
-
+    initial_state = create_initial_state(raw_input=raw_input)
+    if not raw_input:
+        initial_state["student_profile"]["available_hours_per_day"] = 4
+        initial_state["tasks"] = [
+            {
+                "subject": "DBMS",
+                "task_name": "assignment",
+                "priority_score": 9.5,
+                "deadline_days": 2,
+                "difficulty": "hard",
+                "estimated_hours": 8.0,
+            },
+            {
+                "subject": "OOP",
+                "task_name": "quiz",
+                "priority_score": 6.0,
+                "deadline_days": 5,
+                "difficulty": "medium",
+                "estimated_hours": 3.0,
+            },
+        ]
     graph = build_graph()
     return graph.invoke(initial_state)
 
 
 if __name__ == "__main__":
-    final_state = run_demo()
+    user_input = input("\nEnter your study request (or press Enter to use mock data): ")
+    final_state = run_demo(raw_input=user_input)
+    # keep file logging
+    _persist_logs(final_state)
+    pprint(final_state["tasks"])
 
     # 🔥 PRINT ALL AGENT LOGS (this is what you need)
     print("\n========== AGENT EXECUTION LOGS ==========")
     for event in final_state.get("logs", []):
         print(json.dumps(event, indent=2))
-
-    # keep file logging
-    _persist_logs(final_state)
 
     print("\n========== FINAL SCHEDULE ==========")
     pprint(final_state["schedule"])
