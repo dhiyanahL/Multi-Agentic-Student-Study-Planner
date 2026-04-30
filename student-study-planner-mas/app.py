@@ -24,18 +24,21 @@ def _log_event(
     output_data: dict | None = None,
     details: dict | None = None,
 ) -> None:
-    """Append a structured observability event to shared state."""
-    state.setdefault("logs", []).append(
-        {
-            "timestamp": datetime.now().isoformat(timespec="seconds"),
-            "agent": agent,
-            "action": action,
-            "input": input_data or {},
-            "tool_called": tool_called or "",
-            "output": output_data or {},
-            "details": details or {},
-        }
-    )
+    event = {
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "agent": agent,
+        "action": action,
+        "input": input_data or {},
+        "tool_called": tool_called or "",
+        "output": output_data or {},
+        "details": details or {},
+    }
+
+    # ✅ store in state
+    state.setdefault("logs", []).append(event)
+
+    # ✅ print to terminal
+    #print(json.dumps(event, indent=2))
 
 
 def _persist_logs(state: PlannerState) -> None:
@@ -147,8 +150,20 @@ def run_demo() -> PlannerState:
 
 if __name__ == "__main__":
     final_state = run_demo()
-    _persist_logs(final_state)
-    pprint(final_state["schedule"])
-    pprint(final_state["schedule_meta"])
-    pprint(final_state["feedback"])
 
+    # 🔥 PRINT ALL AGENT LOGS (this is what you need)
+    print("\n========== AGENT EXECUTION LOGS ==========")
+    for event in final_state.get("logs", []):
+        print(json.dumps(event, indent=2))
+
+    # keep file logging
+    _persist_logs(final_state)
+
+    print("\n========== FINAL SCHEDULE ==========")
+    pprint(final_state["schedule"])
+
+    print("\n========== SCHEDULE META ==========")
+    pprint(final_state["schedule_meta"])
+
+    print("\n========== FEEDBACK ==========")
+    pprint(final_state["feedback"])
