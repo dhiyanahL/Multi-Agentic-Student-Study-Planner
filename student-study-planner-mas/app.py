@@ -10,6 +10,7 @@ from pprint import pprint
 from langgraph.graph import END, START, StateGraph
 
 from agents.input_agent import run_input_agent
+from agents.review_agent import run_review_feedback_agent
 from agents.schedule_agent import run_schedule_generation_agent
 from agents.task_prioritization_agent import run_task_prioritization_agent
 from state.state_schema import PlannerState, create_initial_state
@@ -70,29 +71,8 @@ def schedule_generation_node(state: PlannerState) -> PlannerState:
 
 
 def review_feedback_node(state: PlannerState) -> PlannerState:
-    """
-    Placeholder for Agent 4.
-
-    Adds basic feedback based on schedule meta as a minimal end-to-end flow.
-    """
-    overload = bool(state.get("schedule_meta", {}).get("overload"))
-    if overload:
-        state.setdefault("feedback", []).append(
-            "Warning: workload exceeds available capacity before one or more deadlines."
-        )
-    else:
-        state.setdefault("feedback", []).append("Schedule appears feasible with current constraints.")
-
-    _log_event(
-        state,
-        "ReviewFeedbackAgent",
-        "basic_review",
-        input_data={"overload": overload},
-        tool_called="",
-        output_data={"feedback_count": len(state.get("feedback", []))},
-        details={"overload": overload},
-    )
-    return state
+    """Agent 4 node: Member 4 review agent (tool-backed)."""
+    return run_review_feedback_agent(state)
 
 
 def build_graph():
