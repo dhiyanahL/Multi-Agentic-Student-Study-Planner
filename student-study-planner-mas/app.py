@@ -119,7 +119,10 @@ def run_demo(raw_input: str = "") -> PlannerState:
 
 
 if __name__ == "__main__":
-    user_input = input("\nEnter your study request (or press Enter to use mock data): ")
+    print("\n🎓 Welcome to the AI Study Planner!")
+    print("\nPlease include your subjects, deadlines, and how many hours you can study daily.")
+    print("\n(Defaults: 7 days for missing deadlines, 3 hours/day for missing study time)")
+    user_input = input("\nEnter your request (or press Enter for mock data): ")
     final_state = run_demo(raw_input=user_input)
     # keep file logging
     _persist_logs(final_state)

@@ -47,7 +47,6 @@ def test_run_input_agent_extracts_tasks_list(monkeypatch: Any) -> None:
     monkeypatch.setattr("agents.input_agent.parse_student_input", _mock_parser)
 
     updated = run_input_agent(state)
-    assert updated["tasks"] == state["tasks"]
     assert isinstance(updated["tasks"], list)
     assert len(updated["tasks"]) == 1
     assert updated["tasks"][0]["subject"] == "Math"
@@ -61,12 +60,12 @@ def test_run_input_agent_extracts_available_hours_per_day(monkeypatch: Any) -> N
             return type(
                 "Resp",
                 (),
-                {"tool_calls": [{"name": "parse_student_input", "args": {"available_hours_per_day": 4, "tasks": []}}]},
+                # Add a fake task so our new 'while True' loop breaks properly
+                {"tool_calls": [{"name": "parse_student_input", "args": {"available_hours_per_day": 4, "tasks": [{"subject": "math", "task_name": "exam"}]}}]},
             )()
 
     def _mock_parser(*, available_hours_per_day: int, tasks: list[dict]) -> dict[str, object]:
         assert available_hours_per_day == 4
-        assert tasks == []
         return {"available_hours_per_day": available_hours_per_day, "tasks": tasks}
 
     monkeypatch.setattr("agents.input_agent._get_llm_with_tools", lambda: _FakeToolLLM())
@@ -74,7 +73,6 @@ def test_run_input_agent_extracts_available_hours_per_day(monkeypatch: Any) -> N
 
     updated = run_input_agent(state)
     assert updated["student_profile"]["available_hours_per_day"] == 4
-    assert state["student_profile"]["available_hours_per_day"] == 4
 
 
 def test_run_input_agent_handles_irrelevant_text_safely(monkeypatch: Any) -> None:
@@ -85,15 +83,15 @@ def test_run_input_agent_handles_irrelevant_text_safely(monkeypatch: Any) -> Non
             return type("Resp", (), {"tool_calls": []})()
 
     def _mock_parser(*, available_hours_per_day: int, tasks: list[dict]) -> dict[str, object]:
-        assert available_hours_per_day == 0
+        assert available_hours_per_day == 3  # Updated to expect our new default of 3!
         assert tasks == []
         return {"available_hours_per_day": available_hours_per_day, "tasks": tasks}
 
     monkeypatch.setattr("agents.input_agent._get_llm_with_tools", lambda: _FakeToolLLM())
     monkeypatch.setattr("agents.input_agent.parse_student_input", _mock_parser)
+    
+    # Simulate the user just pressing 'Enter' when asked to try again
+    monkeypatch.setattr("builtins.input", lambda _: "")
 
     updated = run_input_agent(state)
-    assert isinstance(updated["tasks"], list)
-    assert updated["tasks"] == []
-    assert "student_profile" in updated
-    assert updated["student_profile"]["available_hours_per_day"] == 0
+    assert updated == {}

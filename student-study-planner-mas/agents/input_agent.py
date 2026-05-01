@@ -31,6 +31,7 @@ Rules:
 4) Extract only academic tasks and available daily study hours.
 4) If a task difficulty is not specified, use "medium".
 5) Keep extraction faithful and conservative.
+6) If the user mentions a task but does not provide a deadline, default deadline_days to 7. If the user does not provide available study hours, default available_hours_per_day to 3.
 """.strip()
 
 _llm_with_tools: Any | None = None
@@ -67,7 +68,6 @@ def _get_llm_with_tools() -> Any:
         _llm_with_tools = llm.bind_tools([parse_student_input])
     return _llm_with_tools
 
-
 def run_input_agent(state: dict[str, Any]) -> dict[str, Any]:
     """Run Agent 1 to parse raw input into tasks and student profile."""
     if not isinstance(state, dict):
@@ -79,41 +79,75 @@ def run_input_agent(state: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(raw_input, str):
         raise ValueError("state['raw_input'] must be a string.")
 
-    tool_args: dict[str, Any] | None = None
-    try:
-        from langchain_core.messages import HumanMessage, SystemMessage
+    # START THE LOOP
+    while True:
+        tool_args: dict[str, Any] | None = None
+        try:
+            from langchain_core.messages import HumanMessage, SystemMessage
 
-        llm_with_tools = _get_llm_with_tools()
-        response = llm_with_tools.invoke(
-            [
-                SystemMessage(content=_SYSTEM_PROMPT),
-                HumanMessage(content=raw_input),
-            ]
+            llm_with_tools = _get_llm_with_tools()
+            response = llm_with_tools.invoke(
+                [
+                    SystemMessage(content=_SYSTEM_PROMPT),
+                    HumanMessage(content=raw_input),
+                ]
+            )
+            tool_calls = getattr(response, "tool_calls", []) or []
+            tool_args = _extract_tool_args(tool_calls)
+        except ModuleNotFoundError:
+            tool_args = None
+
+        safe_tool_args = tool_args if isinstance(tool_args, dict) else {}
+        
+        # --- 🛡️ PYTHON-SIDE SAFETY ENFORCEMENT 🛡️ ---
+        # 1. Enforce default hours if missing, 0, or None
+        safe_hours = safe_tool_args.get("available_hours_per_day")
+        if safe_hours in (None, 0, ""):
+            safe_hours = 3
+            
+        # 2. Enforce default task values if missing or None
+        safe_tasks = safe_tool_args.get("tasks", [])
+        if not isinstance(safe_tasks, list):
+            safe_tasks = []
+            
+        for task in safe_tasks:
+            if task.get("deadline_days") in (None, "", 0):
+                task["deadline_days"] = 7
+            if task.get("difficulty") in (None, ""):
+                task["difficulty"] = "medium"
+        # ---------------------------------------------
+
+        parsed_output = parse_student_input(
+            **{
+                "available_hours_per_day": int(safe_hours),
+                "tasks": safe_tasks,
+            }
         )
-        tool_calls = getattr(response, "tool_calls", []) or []
-        tool_args = _extract_tool_args(tool_calls)
-    except ModuleNotFoundError:
-        tool_args = None
 
-    safe_tool_args = tool_args if isinstance(tool_args, dict) else {}
-    safe_hours = safe_tool_args.get("available_hours_per_day", 0)
-    safe_tasks = safe_tool_args.get("tasks", [])
-    if not isinstance(safe_tasks, list):
-        safe_tasks = []
+        tasks = parsed_output.get("tasks", [])
 
-    parsed_output = parse_student_input(
-        **{
-            "available_hours_per_day": int(safe_hours) if safe_hours is not None else 0,
-            "tasks": safe_tasks,
-        }
-    )
-    tasks = parsed_output.get("tasks", [])
-    available_hours = parsed_output.get("available_hours_per_day", 0)
+        # Check if the AI successfully extracted tasks
+        if tasks:
+            break  # We found tasks! Break the loop and continue.
+
+        # If we get here, no tasks were found. Prompt the user again!
+        print("\n🤖 [Input Agent]: I couldn't find any academic tasks in your message.")
+        print("Please explicitly mention a subject and an assignment or exam.")
+        print("(Note: If you don't provide a deadline or study hours, I will default to 7 days and 3 hours/day).")
+        raw_input = input("\nTry again (or press Enter to use mock data): ")
+
+        if not raw_input.strip():
+            # If the user gives up and just presses Enter, escape the loop and do nothing
+            return {}
+
+    # END THE LOOP 
+
+    available_hours = parsed_output.get("available_hours_per_day", 3)
 
     updated_fields = {
         "tasks": tasks if isinstance(tasks, list) else [],
         "student_profile": {
-            "available_hours_per_day": int(available_hours) if available_hours is not None else 0
+            "available_hours_per_day": int(available_hours)
         },
     }
 
