@@ -1,3 +1,5 @@
 pytest
 langgraph
+langchain-core
+langchain-ollama
 

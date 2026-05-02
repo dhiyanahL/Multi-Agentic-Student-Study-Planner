@@ -49,6 +49,7 @@ class PlannerState(TypedDict, total=False):
     schedule: dict[str, Any]
     schedule_meta: dict[str, Any]
     feedback: list[str]
+    review_report: dict[str, Any]
     logs: list[LogEvent]
 
 
@@ -62,5 +63,6 @@ def create_initial_state(raw_input: str = "") -> PlannerState:
         "schedule": {},
         "schedule_meta": {},
         "feedback": [],
+        "review_report": {},
         "logs": [],
     }
