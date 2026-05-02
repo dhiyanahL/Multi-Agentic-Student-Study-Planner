@@ -27,11 +27,15 @@ Rules:
 2) Always call the tool `parse_student_input` exactly once.
 3) Pass arguments in this exact shape:
    - available_hours_per_day: int
-   - tasks: list of dicts, each with subject, task_name, deadline_days, difficulty
+   - tasks: list of objects, each with:
+     - subject, task_name, deadline_days, difficulty
+     - estimated_hours: number ONLY when the student stated workload (e.g. "6 hours", "about 5 hrs").
+       If they did not mention hours for that task, use null for estimated_hours (do not guess).
 4) Extract only academic tasks and available daily study hours.
-4) If a task difficulty is not specified, use "medium".
-5) Keep extraction faithful and conservative.
-6) If the user mentions a task but does not provide a deadline, default deadline_days to 7. If the user does not provide available study hours, default available_hours_per_day to 3.
+5) If a task difficulty is not specified, use "medium".
+6) Keep extraction faithful and conservative.
+7) If the user mentions a task but does not provide a deadline, default deadline_days to 7.
+   If the user does not provide available study hours, default available_hours_per_day to 3.
 """.strip()
 
 _llm_with_tools: Any | None = None
@@ -111,10 +115,21 @@ def run_input_agent(state: dict[str, Any]) -> dict[str, Any]:
             safe_tasks = []
             
         for task in safe_tasks:
+            if not isinstance(task, dict):
+                continue
             if task.get("deadline_days") in (None, "", 0):
                 task["deadline_days"] = 7
             if task.get("difficulty") in (None, ""):
                 task["difficulty"] = "medium"
+            # Preserve estimated_hours when LLM provided it; omit key otherwise — parser fills defaults
+            eh = task.get("estimated_hours")
+            if eh is not None and eh != "":
+                try:
+                    task["estimated_hours"] = float(eh)
+                except (TypeError, ValueError):
+                    task.pop("estimated_hours", None)
+            else:
+                task.pop("estimated_hours", None)
         # ---------------------------------------------
 
         parsed_output = parse_student_input(
